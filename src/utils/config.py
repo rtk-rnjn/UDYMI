@@ -42,15 +42,15 @@ def _parse_env(
     """Parse an environment variable into a Python type."""
 
     value = os.environ.get(str(key), default)
+
+    if (val := _bool_converter(value)) is not None:
+        return val
+
     if value is None:
         raise ValueError(f"{key} is not set")
     if "|" in value:
         return [_parse_env(key=None, default=key) for key in value.split("|")]
-    if value.isdigit():
-        return int(value)
-    if value.replace(".", "", 1).isdigit():
-        return float(value)
-    return val if (val := _bool_converter(value)) else value    
+    return int(value) if value.isdigit() else value
 
 
 class Config:

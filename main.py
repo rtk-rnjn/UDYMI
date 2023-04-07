@@ -9,4 +9,4 @@ if os.name == "nt":
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(load_dotenv=True)
