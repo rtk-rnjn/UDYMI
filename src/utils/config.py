@@ -50,7 +50,7 @@ def _parse_env(
         return int(value)
     if value.replace(".", "", 1).isdigit():
         return float(value)
-    return value.lower() == "true" if value.lower() in ("true", "false") else value
+    return val if (val := _bool_converter(value)) else value    
 
 
 class Config:
