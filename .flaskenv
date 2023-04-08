@@ -3,5 +3,5 @@ FLASK_APP="main"
 FLASK_RUN_PORT=5000
 HOST="localhost"
 FLASK_DEBUG=1
-FLASK_ENV="development"
+FLASK_ENV="production"
 FLASK_SERVER_NAME="localhost:5000"
