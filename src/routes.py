@@ -1,6 +1,6 @@
 from flask import flash, redirect, render_template, url_for
 
-from src import app
+from src import app, bcrypt
 
 from .forms import LoginForm, RegistrationForm
 
@@ -35,7 +35,13 @@ async def about():
 async def register():
     form = RegistrationForm()
     if form.validate_on_submit():
-        flash(f"Account created for {form.username.data}!", "success")
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode("utf-8")
+        if await app.db.register_user(  # type: ignore
+            username=form.username.data, email=form.email.data, password=hashed_password
+        ):
+            flash(f"Account created for {form.username.data}!", "success")
+        else:
+            flash(f"Account already exists for {form.username.data}!", "danger")
         return redirect(url_for("home"))
     return render_template("register.html", title="Register", form=form)
 
