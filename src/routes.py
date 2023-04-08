@@ -1,8 +1,8 @@
 from flask import flash, redirect, render_template, url_for
 
 from src import app, bcrypt
+from src.forms import LoginForm, RegistrationForm
 
-from .forms import LoginForm, RegistrationForm
 
 posts = [
     {
@@ -50,7 +50,9 @@ async def register():
 async def login():
     form = LoginForm()
     if form.validate_on_submit():
-        if form.email.data == "admin@admin.com" and form.password.data == "password":
+        if await app.db.verify_password(  # type: ignore
+            username_or_email=form.email.data, password=form.password.data
+        ):
             flash("You have been logged in!", "success")
             return redirect(url_for("home"))
         else:

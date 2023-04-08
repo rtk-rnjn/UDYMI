@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, TypeAlias, Union
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     MotorDB: TypeAlias = AsyncIOMotorDatabase  # type: ignore
     MotorCollection: TypeAlias = AsyncIOMotorCollection  # type: ignore
 
-    from pymongo.results import InsertOneResult
+    from pymongo.results import InsertOneResult, DeleteResult
     from pymongo.typings import _DocumentType as DocumentType
 
     ReturnData: TypeAlias = DocumentType  # type: ignore
@@ -44,7 +44,7 @@ class DB:
             {
                 "$or": [
                     {"username": username},
-                    # {"email": email},
+                    {"email": email},
                 ]
             }
         )
@@ -55,13 +55,14 @@ class DB:
             {"username": username, "email": email, **kwargs}
         )
         if return_data.acknowledged:
-            self.cache[username] = {
+            cache_data = {
                 "_id": return_data.inserted_id,
                 "username": username,
                 "email": email,
                 **kwargs,
             }
-            # self.cache[email] = {"username": username, "email": email, **kwargs}
+            self.cache[username] = cache_data
+            self.cache[email] = cache_data
             return True
 
         return True
@@ -73,17 +74,42 @@ class DB:
             col: MotorCollection = self.get_collection("login", "users")
             return await col.find_one({"username": username})
 
-    # async def get_user_by_email(self, *, email: str) -> Any:
-    #     try:
-    #         return self.cache[email]
-    #     except KeyError:
-    #         col: MotorCollection = self.get_collection("login", "users")
-    #         return await col.find_one({"email": email})
+    async def get_user_by_email(self, *, email: str) -> Union[Dict, DocumentType]:  # type: ignore
+        try:
+            return self.cache[email]
+        except KeyError:
+            col: MotorCollection = self.get_collection("login", "users")
+            return await col.find_one({"email": email})
 
-    async def verify_password(self, *, username: str, password: str) -> bool:
-        user = await self.get_user(username=username)
+    async def verify_password(self, *, username_or_email: str, password: str) -> bool:
+        user = (await self.get_user(username=username_or_email)) or (
+            await self.get_user_by_email(email=username_or_email)
+        )
         return (
             self.bcrypt.check_password_hash(user["password"], password)
             if user
             else False
         )
+
+    async def delete_user(self, *, username_or_email: str) -> bool:
+        data: DeleteResult = await self.mongo.login.users.delete_one(
+            {"$or": [{"username": username_or_email}, {"email": username_or_email}]}
+        )
+
+        if data.deleted_count:
+            self._delete_from_cache(username_or_email=username_or_email)
+            return True
+
+        return False
+
+    def _check_username_or_email(self, *, username_or_email: str) -> Optional[str]:
+        data = self.cache[username_or_email]
+        if data["email"] == username_or_email:
+            return "email"
+        if data["username"] == username_or_email:
+            return "username"
+
+    def _delete_from_cache(self, *, username_or_email: str) -> None:
+        data = self.cache[username_or_email]
+        del self.cache[data["username"]]
+        del self.cache[data["email"]]

@@ -6,6 +6,7 @@ from src.utils import CONFIG, DB
 import jinja2
 
 app = Flask("main")
+app.config["SECRET_KEY"] = CONFIG.FLASK_SECRET_KEY
 app.config.from_prefixed_env("FLASK_")
 bcrypt = Bcrypt(app)
 setattr(app, "db", DB(flask_app=app, mongo_uri=CONFIG.MONGO_URI, bcrypt=bcrypt))
