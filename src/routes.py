@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 
 from flask import flash, redirect, render_template, url_for, request
 
@@ -89,5 +90,10 @@ async def logout():
 @app.route("/account")
 @login_required
 async def account():
-    user = await app.db.get_user_by_id(_id=current_user._id)  # type: ignore
-    return render_template("account.html", title="Account", user=user)
+    user: dict = await app.db.get_user_by_id(_id=current_user._id)  # type: ignore
+    path = f"static/profile_pics/{user['_id']}.jpg"
+    # check if path exists
+    if not os.path.exists(path):
+        path = "static/profile_pics/default.png"
+    img = url_for("static", filename=path[7:])
+    return render_template("account.html", title="Account", user=user, img=img)
