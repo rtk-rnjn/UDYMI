@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from flask_bcrypt import Bcrypt
 
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 
 
 class DB:
@@ -63,23 +64,52 @@ class DB:
             }
             self.cache[username] = cache_data
             self.cache[email] = cache_data
+            self.cache[str(return_data.inserted_id)] = cache_data
             return True
 
         return True
 
-    async def get_user(self, *, username: str) -> Union[Dict, DocumentType]:  # type: ignore
+    async def get_user(self, *, username: str) -> Union[Dict, None]:  # type: ignore
         try:
             return self.cache[username]
         except KeyError:
             col: MotorCollection = self.get_collection("login", "users")
-            return await col.find_one({"username": username})
+            data: DocumentType = await col.find_one({"username": username})  # type: ignore
+            if data:
+                self.cache[data["username"]] = data
+                self.cache[data["email"]] = data
+                self.cache[data["_id"]] = data
+                return dict(data)
 
-    async def get_user_by_email(self, *, email: str) -> Union[Dict, DocumentType]:  # type: ignore
+        return None
+
+    async def get_user_by_id(self, *, _id: str) -> Union[Dict, None]:  # type: ignore
+        try:
+            return self.cache[_id]
+        except KeyError:
+            col: MotorCollection = self.get_collection("login", "users")
+            data: DocumentType = await col.find_one({"_id": ObjectId(_id)})  # type: ignore
+            if data:
+                self.cache[data["username"]] = data
+                self.cache[data["email"]] = data
+                self.cache[data["_id"]] = data
+                return dict(data)
+
+        return None
+
+    async def get_user_by_email(self, *, email: str) -> Union[Dict, None]:  # type: ignore
         try:
             return self.cache[email]
         except KeyError:
             col: MotorCollection = self.get_collection("login", "users")
-            return await col.find_one({"email": email})
+            data: DocumentType = await col.find_one({"email": email})  # type: ignore
+            if data:
+                self.cache[data["username"]] = data
+                self.cache[data["email"]] = data
+                self.cache[data["_id"]] = data
+                return dict(data)
+
+        return None
 
     async def verify_password(self, *, username_or_email: str, password: str) -> bool:
         user = (await self.get_user(username=username_or_email)) or (

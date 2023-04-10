@@ -1,8 +1,11 @@
-from flask import flash, redirect, render_template, url_for
+from __future__ import annotations
+
+from flask import flash, redirect, render_template, url_for, request
 
 from src import app, bcrypt
 from src.forms import LoginForm, RegistrationForm
-
+from flask_login import login_user, current_user, logout_user, login_required
+from src.modals import User
 
 posts = [
     {
@@ -33,9 +36,13 @@ async def about():
 
 @app.route("/register", methods=["GET", "POST"])
 async def register():
+    if current_user.is_authenticated:  # type: ignore
+        return redirect(url_for("home"))
     form = RegistrationForm()
     if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data).decode("utf-8")
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode(
+            "utf-8"
+        )
         if await app.db.register_user(  # type: ignore
             username=form.username.data, email=form.email.data, password=hashed_password
         ):
@@ -48,13 +55,21 @@ async def register():
 
 @app.route("/login", methods=["GET", "POST"])
 async def login():
+    if current_user.is_authenticated:  # type: ignore
+        return redirect(url_for("home"))
     form = LoginForm()
     if form.validate_on_submit():
         if await app.db.verify_password(  # type: ignore
             username_or_email=form.email.data, password=form.password.data
         ):
-            flash("You have been logged in!", "success")
-            return redirect(url_for("home"))
+            user = await app.db.get_user(username=form.email.data)  # type: ignore
+            if user is not None:
+                user = User(**user)
+                if login_user(user, remember=form.remember.data):
+                    next_page = request.args.get("next")
+                    return (
+                        redirect(next_page) if next_page else redirect(url_for("home"))
+                    )
         else:
             flash("Login Unsuccessful. Please check username and password", "danger")
     return render_template("login.html", title="Login", form=form)
@@ -63,3 +78,16 @@ async def login():
 @app.route("/news")
 async def news():
     return render_template("news.html", title="News", posts=posts)
+
+
+@app.route("/logout")
+async def logout():
+    logout_user()
+    return redirect(url_for("home"))
+
+
+@app.route("/account")
+@login_required
+async def account():
+    user = await app.db.get_user_by_id(_id=current_user._id)  # type: ignore
+    return render_template("account.html", title="Account", user=user)
