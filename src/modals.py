@@ -16,6 +16,9 @@ class _User:
         for key, val in kwargs.items():
             setattr(self, key, val)
 
+    def __repr__(self) -> str:
+        return f"<User {self.username}>"
+
 
 class User(_User, UserMixin):
     id: str
